@@ -1,62 +1,44 @@
--- 创建表
-CREATE TABLE employees (
-    id NUMBER PRIMARY KEY,
-    first_name VARCHAR2(50),
-    last_name VARCHAR2(50),
-    birth_date DATE,
-    hire_date DATE,
-    salary FLOAT,
-    is_full_time CHAR(1),
-    department_id SMALLINT,
-    manager_id INTEGER,
-    comments CLOB,
-    resume BLOB,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH LOCAL TIME ZONE,
-    phone_number VARCHAR2(15),
-    email VARCHAR2(100),
-    field17 RAW(200),
-    field18 LONG,
-    field20 INTERVAL YEAR TO MONTH,
-    field21 INTERVAL DAY TO SECOND,
-    field22 BINARY_FLOAT,
-    field23 BINARY_DOUBLE
-);
+import cx_Oracle
+import pandas as pd
 
--- 插入数据
-DECLARE
-    i NUMBER;
-    start_date DATE := TO_DATE('1980-01-01', 'YYYY-MM-DD');
-BEGIN
-    FOR i IN 1..1000 LOOP
-        INSERT INTO employees (
-            id, first_name, last_name, birth_date, hire_date, salary, is_full_time, 
-            department_id, manager_id, comments, resume, created_at, updated_at, 
-            phone_number, email, field17, field18, field20, field21, field22, field23)
-        VALUES (
-            i, 
-            'FirstName' || i, 
-            'LastName' || i, 
-            start_date + i, 
-            CURRENT_TIMESTAMP, 
-            5000.00, 
-            'Y', 
-            1, 
-            1, 
-            TO_CLOB('This is a comment'), 
-            EMPTY_BLOB(), 
-            CURRENT_TIMESTAMP, 
-            CURRENT_TIMESTAMP, 
-            '123-456-7890', 
-            'email' || i || '@example.com', 
-            HEXTORAW('DEADBEEF'), 
-            'This is a long field', 
-            INTERVAL '4-3' YEAR TO MONTH, 
-            INTERVAL '3 4:5:6' DAY TO SECOND, 
-            23.4, 
-            25.3
-        );
-    END LOOP;
-    COMMIT;
-END;
-/
+# 数据库连接字符串
+connection_string1 = 'user1/password1@host1:port1/service_name1'
+connection_string2 = 'user2/password2@host2:port2/service_name2'
+
+# 连接到数据库
+connection1 = cx_Oracle.connect(connection_string1)
+connection2 = cx_Oracle.connect(connection_string2)
+
+# 查询表结构
+query = 'SELECT column_name, data_type FROM user_tab_columns WHERE table_name = :table_name'
+table_name = 'YOUR_TABLE_NAME'
+columns1 = pd.read_sql(query, params={'table_name': table_name}, con=connection1)
+columns2 = pd.read_sql(query, params={'table_name': table_name}, con=connection2)
+
+# 找到相同和不同的列
+common_columns = pd.merge(columns1, columns2, on=['column_name', 'data_type'])
+different_columns = pd.concat([columns1, columns2]).drop_duplicates(keep=False)
+
+# 输出到 CSV
+common_columns.to_csv('common_columns.csv', index=False)
+different_columns.to_csv('different_columns.csv', index=False)
+
+# 查询表数据
+query1 = f'SELECT * FROM {table_name}'
+query2 = f'SELECT * FROM {table_name}'
+data1 = pd.read_sql(query1, con=connection1)
+data2 = pd.read_sql(query2, con=connection2)
+
+# 找到相同和不同的数据
+common_data = pd.merge(data1, data2)
+different_data1 = pd.concat([data1, data2]).drop_duplicates(keep=False)
+different_data2 = pd.concat([data2, data1]).drop_duplicates(keep=False)
+
+# 输出到 CSV
+common_data.to_csv('common_data.csv', index=False)
+different_data1.to_csv('different_data1.csv', index=False)
+different_data2.to_csv('different_data2.csv', index=False)
+
+# 关闭数据库连接
+connection1.close()
+connection2.close()
