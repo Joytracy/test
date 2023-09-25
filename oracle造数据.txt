@@ -1,28 +1,3 @@
--- 创建表
-CREATE TABLE employees (
-    id NUMBER PRIMARY KEY,
-    first_name VARCHAR2(50),
-    last_name VARCHAR2(50),
-    birth_date DATE,
-    hire_date DATE,
-    salary FLOAT,
-    is_full_time CHAR(1),
-    department_id SMALLINT,
-    manager_id INTEGER,
-    comments CLOB,
-    resume BLOB,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH LOCAL TIME ZONE,
-    phone_number VARCHAR2(15),
-    email VARCHAR2(100),
-    field17 RAW(200),
-    field18 LONG,
-    field20 INTERVAL YEAR TO MONTH,
-    field21 INTERVAL DAY TO SECOND,
-    field22 BINARY_FLOAT,
-    field23 BINARY_DOUBLE
-);
-
 -- 插入数据
 DECLARE
     i NUMBER;
