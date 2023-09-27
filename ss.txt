@@ -1,44 +1,89 @@
 import cx_Oracle
 import pandas as pd
 
-# 数据库连接字符串
-connection_string1 = 'user1/password1@host1:port1/service_name1'
-connection_string2 = 'user2/password2@host2:port2/service_name2'
+dsn1 = cx_Oracle.makedsn('127.0.0.1', '1521', service_name='XE')
+dsn2 = cx_Oracle.makedsn('127.0.0.1', '1521', service_name='XE')
+
+# Oracle数据库连接参数
+config1 = {
+    'user': 'system',
+    'password': 'oracle',
+    'dsn': dsn1
+}
+
+config2 = {
+    'user': 'system',
+    'password': 'oracle',
+    'dsn': dsn2
+}
+
+# SQL查询和表名
+sql1 = "SELECT * FROM EMPLOYEES where FIRST_NAME='FirstName1'"
+sql2 = "SELECT * FROM EMPLOYEES2 where FIRST_NAME='FirstName1'"
 
 # 连接到数据库
-connection1 = cx_Oracle.connect(connection_string1)
-connection2 = cx_Oracle.connect(connection_string2)
+connection1 = cx_Oracle.connect(config1['user'], config1['password'], config1['dsn'])
+connection2 = cx_Oracle.connect(config2['user'], config2['password'], config2['dsn'])
 
-# 查询表结构
-query = 'SELECT column_name, data_type FROM user_tab_columns WHERE table_name = :table_name'
-table_name = 'YOUR_TABLE_NAME'
-columns1 = pd.read_sql(query, params={'table_name': table_name}, con=connection1)
-columns2 = pd.read_sql(query, params={'table_name': table_name}, con=connection2)
+cursor1 = connection1.cursor()
+cursor1.execute(sql1)
+rows1 = cursor1.fetchall()
+columns1 = [desc[0] for desc in cursor1.description]  # 获取列名
 
-# 找到相同和不同的列
-common_columns = pd.merge(columns1, columns2, on=['column_name', 'data_type'])
-different_columns = pd.concat([columns1, columns2]).drop_duplicates(keep=False)
+cursor2 = connection2.cursor()
+cursor2.execute(sql2)
+rows2 = cursor2.fetchall()
+columns2 = [desc[0] for desc in cursor2.description]  # 获取列名
 
-# 输出到 CSV
-common_columns.to_csv('common_columns.csv', index=False)
-different_columns.to_csv('different_columns.csv', index=False)
-
-# 查询表数据
-query1 = f'SELECT * FROM {table_name}'
-query2 = f'SELECT * FROM {table_name}'
-data1 = pd.read_sql(query1, con=connection1)
-data2 = pd.read_sql(query2, con=connection2)
-
-# 找到相同和不同的数据
-common_data = pd.merge(data1, data2)
-different_data1 = pd.concat([data1, data2]).drop_duplicates(keep=False)
-different_data2 = pd.concat([data2, data1]).drop_duplicates(keep=False)
-
-# 输出到 CSV
-common_data.to_csv('common_data.csv', index=False)
-different_data1.to_csv('different_data1.csv', index=False)
-different_data2.to_csv('different_data2.csv', index=False)
-
-# 关闭数据库连接
+# 关闭连接
+cursor1.close()
+cursor2.close()
 connection1.close()
 connection2.close()
+
+# 找出相同和不同的字段
+common_columns = set(columns1) & set(columns2)
+diff_columns = set(columns1) ^ set(columns2)
+
+# 对于相同的字段，比较值并将它们保存到common_rows列表中
+common_rows = []
+for row1, row2 in zip(rows1, rows2):
+    for col in common_columns:
+        index1 = columns1.index(col)
+        index2 = columns2.index(col)
+        common_rows.append([col, row1[index1], col, row2[index2]])
+
+# 对于不同的字段，将它们保存到diff_rows列表中
+diff_rows = []
+for row1, row2 in zip(rows1, rows2):
+    for col in diff_columns:
+        if col in columns1:
+            index1 = columns1.index(col)
+            diff_rows.append([col, row1[index1], None, None])
+        if col in columns2:
+            index2 = columns2.index(col)
+            diff_rows.append([None, None, col, row2[index2]])
+
+
+def highlight_diff(data, color='red'):
+    attr = f'color: {color}'
+    if data.columns[0] == 'Table1 Value' or data.columns[0] == 'Table2 Value':
+        is_diff = data.iloc[:, 1] != data.iloc[:, -1]
+        return pd.DataFrame(np.where(is_diff, attr, ''),
+                            index=data.index, columns=data.columns)
+    else:
+        return pd.DataFrame('', index=data.index, columns=data.columns)
+
+
+# 输出到CSV文件
+common_df = pd.DataFrame(common_rows,
+                         columns=['Table1 Field', 'Table1 Value', 'Table2 Field', 'Table2 Value'])
+common_df.to_csv('common_fields.csv', index=False)
+
+diff_df = pd.DataFrame(diff_rows,
+                       columns=['Table1 Field', 'Table1 Value', 'Table2 Field', 'Table2 Value'])
+diff_df.to_csv('diff_fields.csv', index=False)
+
+# 用这种方式保存为Excel文件
+common_df.style.apply(highlight_diff, axis=None).to_excel('common_fields.xlsx', index=False, engine='openpyxl')
+diff_df.style.apply(highlight_diff, axis=None).to_excel('diff_fields.xlsx', index=False, engine='openpyxl')
